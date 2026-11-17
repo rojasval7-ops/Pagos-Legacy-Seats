@@ -112,6 +112,8 @@
   .seg.p2 { background: var(--blue); }
   .seg.p3 { background: var(--blue-2); }
   .seg.p4 { background: var(--blue-3); }
+  .seg.p5 { background: #00346B; }
+  .seg.green { background: #1E8C4E; }
 
   .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 14px 4px 32px; font-size: .9rem; color: var(--muted); }
   .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
@@ -153,7 +155,7 @@
     </div>
     <div id="anillo-msg" hidden>
       <span class="lbl">Anillo VIP (VRS y LOGE)</span>
-      <span style="color:var(--muted);font-size:.9rem">Se firme cuando se firme: 4 pagos del 25 %, ver última fila</span>
+      <span style="color:var(--muted);font-size:.9rem">Se firme cuando se firme: 100 % del seasonal al firmar y 4 pagos del 25 %, ver última fila</span>
     </div>
     <div id="month-box">
       <span class="lbl" id="m-lbl">¿En qué mes se firma?</span>
@@ -190,6 +192,7 @@
   <div class="legend">
     <span><i style="background:var(--grana)"></i>1.er pago: el día de la firma</span>
     <span><i style="background:var(--blue)"></i>Pagos siguientes, en fechas fijas</span>
+    <span><i style="background:#1E8C4E"></i>Temporada siguiente y anillo VIP: 100 % del seasonal el día de la firma</span>
     <span>El ancho de cada bloque es el porcentaje que se paga</span>
   </div>
 
@@ -204,7 +207,7 @@
     </div>
     <div class="note">
       <h2>Marzo a mayo, dos caminos</h2>
-      <p>Para la temporada actual se paga todo al firmar. Para la siguiente, se reparte en 4 pagos del 25 %.</p>
+      <p>Para la temporada actual se paga todo al firmar. Para la siguiente, el 100 % del seasonal al firmar y 4 pagos del 25 % (julio, octubre, enero y abril).</p>
     </div>
   </section>
 </div>
@@ -218,12 +221,13 @@
     { id: "c", when: "Marzo – mayo", months: [3,4,5], season: "Temporada actual", s: "actual",
       pays: [[100, "Día de la firma"]] },
     { id: "d", sep: "Compra para usar la temporada siguiente", when: "Marzo – mayo", months: [3,4,5], season: "Temporada siguiente", s: "siguiente",
-      pays: [[25, "Día de la firma"], [25, "1 de julio de 2027"], [25, "1 de octubre de 2027"], [25, "1 de enero de 2028"]] },
+      seasonal: true, pays: [[100, "Día de la firma", "green", "100 % seasonal"], [25, "1 de julio de 2027", "p5"], [25, "1 de octubre de 2027", "p2"], [25, "1 de enero de 2028", "p3"], [25, "1 de abril de 2028", "p4"]] },
     { id: "e", when: "Junio – agosto", months: [6,7,8], season: "Temporada siguiente",
-      pays: [[25, "Día de la firma"], [25, "1 de octubre de 2027"], [25, "1 de enero de 2028"], [25, "1 de abril de 2028"]] },
+      seasonal: true, pays: [[100, "Día de la firma", "green", "100 % seasonal"], [25, "1 de julio de 2027", "p5"], [25, "1 de octubre de 2027", "p2"], [25, "1 de enero de 2028", "p3"], [25, "1 de abril de 2028", "p4"]] },
     { id: "f", when: "Cualquier mes", months: [], season: "Temporada 2027/28", vip: true,
       sep: "Producto en el anillo VIP (VRS y LOGE)",
-      pays: [[25, "Día de la firma"], [25, "1 de julio de 2027"], [25, "1 de octubre de 2027"], [25, "1 de enero de 2028"]] }
+      seasonal: true,
+      pays: [[100, "Día de la firma", "green", "100 % seasonal"], [25, "1 de julio de 2027", "p5"], [25, "1 de octubre de 2027", "p2"], [25, "1 de enero de 2028", "p3"], [25, "1 de abril de 2028", "p4"]] }
   ];
   const MONTHS = [[9,"Sep"],[10,"Oct"],[11,"Nov"],[12,"Dic"],[1,"Ene"],[2,"Feb"],[3,"Mar"],[4,"Abr"],[5,"May"],[6,"Jun"],[7,"Jul"],[8,"Ago"]];
   const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
@@ -263,17 +267,23 @@
         const hit = !r.vip && r.months.includes(month) && (!r.s || r.s === season);
         tr.className = hit ? "on" : "off";
       }
-      const am = total ? amounts(total, r.pays) : null;
-      const segs = r.pays.map(([p, d], i) =>
-        `<div class="seg p${i + 1}" style="flex:${p} 1 0">
-           <span class="pct">${pctFmt(p)}</span>
+      const contract = r.seasonal ? r.pays.slice(1) : r.pays;
+      const am = total ? amounts(total, contract) : null;
+      const off = r.seasonal ? 1 : 0;
+      const segs = r.pays.map(([p, d, cls, label], i) => {
+        const isSeasonal = r.seasonal && i === 0;
+        const amt = isSeasonal ? (am ? "Precio seasonal" : "") : (am ? eur.format(am[i - off]) : "");
+        return `<div class="seg ${cls || "p" + (i + 1)}" style="flex:${isSeasonal ? 25 : p} 1 0">
+           <span class="pct">${label || pctFmt(p)}</span>
            <span class="date">${d}</span>
-           ${am ? `<span class="amt">${eur.format(am[i])}</span>` : ""}
-         </div>`).join("");
+           ${amt ? `<span class="amt">${amt}</span>` : ""}
+         </div>`;
+      }).join("");
+      const n = contract.length;
       tr.innerHTML = `
         <td><div class="when">${r.when}</div></td>
         <td class="season">${r.season}</td>
-        <td><div class="count">${r.pays.length}<small>${r.pays.length === 1 ? "pago" : "pagos"}</small></div></td>
+        <td><div class="count">${n}<small>${n === 1 ? "pago" : "pagos"}${r.seasonal ? " + seasonal" : ""}</small></div></td>
         <td><div class="split">${segs}</div></td>`;
       tbody.appendChild(tr);
     });
